@@ -1,7 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-
-//'/sign-in(.*)', '/sign-up(.*)',
-// const isPublicRoute = createRouteMatcher(['/'])
+import { NextResponse } from "next/server";
 
 const publicRoutes = [
   '/agency/sign-in(.*)',
@@ -11,12 +9,42 @@ const publicRoutes = [
 ];
 const isPublicRoute = createRouteMatcher(publicRoutes);
 
-// export default clerkMiddleware()
 
-export default clerkMiddleware((auth, request) => {
+export default clerkMiddleware((auth, req) => {
 
-  if (!isPublicRoute(request)) {
+  if (!isPublicRoute(req)) {
+
     auth().protect()
+  }
+
+  // rewrite domains
+  const url = req.nextUrl;
+  const searchParams = url.searchParams.toString();
+  let hostname = req.headers.get('host')
+
+  const pathWithSearchParams = `${url.pathname}${searchParams.length > 0 ? `?${searchParams}` : ''
+    }`;
+
+  //if subdomain exists
+  const customSubDomain = hostname?.split(`${process.env.NEXT_PUBLIC_DOMAIN}`).filter(Boolean)[0]
+
+  if (customSubDomain) {
+    return NextResponse.rewrite(
+      new URL(`/${customSubDomain}${pathWithSearchParams}`, req.url)
+    );
+  }
+
+  // redirect signin and signup paths if users navigate to these routes
+  if (url.pathname === '/sign-in' || url.pathname === '/sign-up') {
+    return NextResponse.redirect(new URL(`/agency/sign-in`, req.url));
+  }
+
+  // same for agency and subaccount
+  if (
+    url.pathname.startsWith('/agency') ||
+    url.pathname.startsWith('/subaccount')
+  ) {
+    return NextResponse.rewrite(new URL(`${pathWithSearchParams}`, req.url))
   }
 })
 
