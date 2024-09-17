@@ -12,6 +12,7 @@
     "@clerk/nextjs": "^5.1.5",
     "@clerk/themes": "^2.1.9",
     "@hookform/resolvers": "^3.6.0",
+    "@prisma/client": "^5.19.1",
     "@radix-ui/react-accordion": "^1.1.2",
     "@radix-ui/react-alert-dialog": "^1.0.5",
     "@radix-ui/react-aspect-ratio": "^1.0.3",
@@ -70,6 +71,7 @@
     "eslint": "^8",
     "eslint-config-next": "14.1.0",
     "postcss": "^8",
+    "prisma": "^5.19.1",
     "tailwindcss": "^3.3.0",
     "typescript": "^5"
   }
