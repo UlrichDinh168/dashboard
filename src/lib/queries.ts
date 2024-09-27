@@ -31,90 +31,97 @@ export const getAuthUserDetails = async () => {
   return userData
 }
 
-export const saveActivityLogsNotification = async ({ agencyId, description, subaccountId }: {
-  agencyId?: string, description: string, subaccountId?: string
+// Helper function to create a notification
+const createNotification = async ({
+  userId,
+  agencyId,
+  description,
+  subaccountId,
+  userName,
+}: {
+  userId: string;
+  agencyId: string;
+  description: string;
+  subaccountId?: string;
+  userName: string;
 }) => {
-  const authUser = await currentUser()
+  const notificationData: any = {
+    notification: `${userName} | ${description}`,
+    User: { connect: { id: userId } },
+    Agency: { connect: { id: agencyId } },
+  };
 
-  let userData;
-  if (!authUser) {
-    const response = await db.user.findFirst({
+  // Add subaccount if it exists
+  if (subaccountId) {
+    notificationData.SubAccount = { connect: { id: subaccountId } };
+  }
+
+  await db.notification.create({ data: notificationData });
+};
+
+export const saveActivityLogsNotification = async ({
+  agencyId,
+  description,
+  subaccountId,
+}: {
+  agencyId?: string;
+  description: string;
+  subaccountId?: string;
+}) => {
+  // Validate required inputs early on
+  if (!description || !subaccountId) {
+    throw new Error('Description and subaccountId are required.');
+  }
+
+  // Fetch current user or user by subaccountId
+  const authUser = await currentUser();
+  let userData = null;
+
+  if (authUser) {
+    // Try to find the user by email if authenticated
+    userData = await db.user.findUnique({
+      where: { email: authUser?.emailAddresses[0].emailAddress },
+    });
+  } else {
+    // If no authenticated user, find user associated with subaccountId
+    userData = await db.user.findFirst({
       where: {
         Agency: {
           SubAccount: {
-            some: {
-              id: subaccountId
-            }
-          }
-        }
-      }
-    })
-
-    if (response) {
-      userData = response
-    }
-  } else {
-    userData = await db.user.findUnique({
-      where: {
-        email: authUser?.emailAddresses[0].emailAddress
-      }
-    })
-    if (!userData) {
-      console.log('Could not find a user');
-      return
-    }
+            some: { id: subaccountId },
+          },
+        },
+      },
+    });
   }
 
-  // 1,51,08
-  let foundAgencyId = agencyId
+  // Handle case where user is not found
+  if (!userData) {
+    console.error('Could not find a user.');
+    return;
+  }
+
+  // Get agencyId if not provided
+  let foundAgencyId = agencyId;
   if (!foundAgencyId) {
-    if (!subaccountId) {
-      throw new Error('You need to provide at least an agency Id or subaccount Id')
+    const subAccount = await db.subAccount.findUnique({
+      where: { id: subaccountId },
+    });
+    if (!subAccount) {
+      throw new Error(`SubAccount with ID ${subaccountId} not found.`);
     }
+    foundAgencyId = subAccount.agencyId;
   }
-  const response = await db.subAccount.findUnique({
-    where: { id: subaccountId }
-  })
-  if (response) foundAgencyId = response.agencyId
 
-  if (subaccountId) {
-    await db.notification.create({
-      data: {
-        notification: `${userData?.name} | ${description}`,
-        User: {
-          connect: {
-            id: userData?.id,
-          },
-        },
-        Agency: {
-          connect: {
-            id: foundAgencyId,
-          },
-        },
-        SubAccount: {
-          connect: { id: subaccountId },
-        },
-      },
-    })
-  } else {
-    await db.notification.create({
-      data: {
-        notification: `${userData?.name} | ${description}`,
-        User: {
-          connect: {
-            id: userData?.id,
-          },
-        },
-        Agency: {
-          connect: {
-            id: foundAgencyId,
-          },
-        },
-      },
-    })
-  }
+  // Create notification in the database
+  await createNotification({
+    userId: userData.id,
+    agencyId: foundAgencyId,
+    description,
+    subaccountId,
+    userName: userData.name,
+  });
 };
-
 
 
 
@@ -128,38 +135,73 @@ export const createTeamUser = async (agencyId: string, user: User) => {
 
 
 export const verifyAndAcceptInvitation = async () => {
-  const user = await currentUser()
-  if (!user) return redirect('/sign-in')
+  try {
+    const user = await currentUser();
+    if (!user) return redirect('/sign-in');
 
-  const invitationExist = await db.invitation.findUnique({
-    where: {
-      email: user.emailAddresses[0].emailAddress,
-      status: 'PENDING' //if status===PENDING, it means it has invitation
+    const { emailAddresses, id: userId, firstName, lastName, imageUrl } = user;
+    const userEmail = emailAddresses?.[0]?.emailAddress;
+    if (!userEmail) throw new Error('User email is missing.');
+
+    // Check for pending invitation
+    const invitation = await db.invitation.findUnique({
+      where: {
+        email: userEmail,
+        status: 'PENDING',
+      },
+    });
+
+    if (invitation) {
+      const { agencyId, role, email } = invitation;
+
+      // Create team user
+      const now = new Date();
+      const userDetails = await createTeamUser(agencyId, {
+        email,
+        agencyId,
+        avatarUrl: imageUrl,
+        id: userId,
+        name: `${firstName} ${lastName}`,
+        role,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      // Save activity logs
+      await saveActivityLogsNotification({
+        agencyId,
+        description: 'Joined',
+        subaccountId: undefined,
+      });
+
+      if (userDetails) {
+        // Update Clerk metadata with role
+        await clerkClient.users.updateUserMetadata(userId, {
+          privateMetadata: {
+            role: userDetails.role || 'SUBACCOUNT_USER',
+          },
+        });
+
+        // Remove the processed invitation
+        await db.invitation.delete({
+          where: { email: userDetails.email },
+        });
+
+        return userDetails.agencyId;
+      }
+      return null;
     }
-  })
 
-  if (invitationExist) {
-    const userDetails = await createTeamUser(invitationExist.agencyId, {
-      email: invitationExist.email,
-      agencyId: invitationExist.agencyId,
-      avatarUrl: user.imageUrl,
-      id: user.id,
-      name: `${user.firstName} ${user.lastName}`,
-      role: invitationExist.role,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    })
+    // If no invitation exists, find the agency directly
+    const existingAgencyUser = await db.user.findUnique({
+      where: {
+        email: userEmail,
+      },
+    });
 
-    await saveActivityLogsNotification({
-      agencyId: invitationExist?.agencyId, description: 'Joined', subaccountId: undefined
-    })
-
-    if (userDetails) {
-      await clerkClient.users.updateUserMetadata(user.id, {
-        privateMetadata: {
-          role: userDetails.role || 'SUBACCOUNT_USER'
-        }
-      })
-    }
+    return existingAgencyUser ? existingAgencyUser.agencyId : null;
+  } catch (error) {
+    console.error('Error in verifyAndAcceptInvitation:', error);
+    return null;
   }
 };
