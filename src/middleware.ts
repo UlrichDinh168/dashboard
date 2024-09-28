@@ -11,41 +11,50 @@ const isPublicRoute = createRouteMatcher(publicRoutes);
 
 
 export default clerkMiddleware((auth, req) => {
-
-  if (!isPublicRoute(req)) {
-
-    auth().protect()
-  }
-
-  // rewrite domains
   const url = req.nextUrl;
   const searchParams = url.searchParams.toString();
-  let hostname = req.headers.get('host')
+  const hostname = req.headers.get('host') ?? '';
+  const pathWithSearchParams = `${url.pathname}${searchParams ? `?${searchParams}` : ''}`;
 
-  const pathWithSearchParams = `${url.pathname}${searchParams.length > 0 ? `?${searchParams}` : ''
-    }`;
+  // Protect non-public routes
+  if (!isPublicRoute(req)) {
+    auth().protect();
+  }
 
-  //if subdomain exists
-  const customSubDomain = hostname?.split(`${process.env.NEXT_PUBLIC_DOMAIN}`).filter(Boolean)[0]
+  // Handle subdomain-based rewriting
+  const mainDomain = process.env.NEXT_PUBLIC_DOMAIN;
+  if (!mainDomain) {
+    throw new Error("NEXT_PUBLIC_DOMAIN is not defined.");
+  }
 
+  const customSubDomain = hostname.split(mainDomain).filter(Boolean)[0];
   if (customSubDomain) {
     return NextResponse.rewrite(
       new URL(`/${customSubDomain}${pathWithSearchParams}`, req.url)
     );
   }
 
-  // redirect signin and signup paths if users navigate to these routes
-  if (url.pathname === '/sign-in' || url.pathname === '/sign-up') {
-    return NextResponse.redirect(new URL(`/agency/sign-in`, req.url));
+  // Redirect sign-in/sign-up paths to agency-specific routes
+  if (['/sign-in', '/sign-up'].includes(url.pathname)) {
+    return NextResponse.redirect(new URL('/agency/sign-in', req.url));
   }
 
-  // same for agency and subaccount
+  // Handle homepage or /site route for the primary domain
   if (
-    url.pathname.startsWith('/agency') ||
-    url.pathname.startsWith('/subaccount')
+    url.pathname === '/' ||
+    (url.pathname === '/site' && hostname === process.env.NEXT_PUBLIC_DOMAIN)
   ) {
-    return NextResponse.rewrite(new URL(`${pathWithSearchParams}`, req.url))
+    return NextResponse.rewrite(new URL('/site', req.url));
   }
+
+  // Rewrite for agency and subaccount routes
+  if (url.pathname.startsWith('/agency') || url.pathname.startsWith('/subaccount')) {
+    return NextResponse.rewrite(new URL(pathWithSearchParams, req.url));
+  }
+
+  return NextResponse.next(); // Default response for all other cases
+
+
 })
 
 export const config = {
