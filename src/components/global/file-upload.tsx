@@ -13,6 +13,11 @@ type Props = {
 const FileUpload = ({ apiEndpoint, onChange, value }: Props) => {
   const type = value?.split('.').pop()
 
+  const handleRemove = () => {
+    onChange('')
+  }
+
+
   if (value) {
     return (
       <div className="flex flex-col justify-center items-center">
@@ -27,7 +32,7 @@ const FileUpload = ({ apiEndpoint, onChange, value }: Props) => {
           </div>
         ) : (
           <div className="relative flex items-center p-2 mt-2 rounded-md bg-background/10">
-            <FileIcon />
+            <FileIcon className="shrink-0" />
             <a
               href={value}
               target="_blank"
@@ -39,7 +44,7 @@ const FileUpload = ({ apiEndpoint, onChange, value }: Props) => {
           </div>
         )}
         <Button
-          onClick={() => onChange('')}
+          onClick={handleRemove}
           variant="ghost"
           type="button"
         >
@@ -57,7 +62,7 @@ const FileUpload = ({ apiEndpoint, onChange, value }: Props) => {
           onChange(res?.[0].url)
         }}
         onUploadError={(error: Error) => {
-          console.log(error)
+          console.error('Upload error:', error)
         }}
       />
     </div>
