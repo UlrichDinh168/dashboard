@@ -16,8 +16,6 @@ const FileUpload = ({ apiEndpoint, onChange, value }: Props) => {
   const handleRemove = () => {
     onChange('')
   }
-
-
   if (value) {
     return (
       <div className="flex flex-col justify-center items-center">
