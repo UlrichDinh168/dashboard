@@ -137,6 +137,8 @@ export const createTeamUser = async (agencyId: string, user: User) => {
 export const verifyAndAcceptInvitation = async () => {
   try {
     const user = await currentUser();
+    console.log(user, 'here');
+
     if (!user) return redirect('/sign-in');
 
     const { emailAddresses, id: userId, firstName, lastName, imageUrl } = user;
@@ -150,6 +152,7 @@ export const verifyAndAcceptInvitation = async () => {
         status: 'PENDING',
       },
     });
+    console.log(invitation, 'invitation');
 
     if (invitation) {
       const { agencyId, role, email } = invitation;

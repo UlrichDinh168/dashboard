@@ -1,53 +1,23 @@
 'use client'
+import React, { useEffect, useState } from 'react'
 import { Agency } from '@prisma/client'
 import { useForm } from 'react-hook-form'
-import React, { useEffect, useState } from 'react'
 import { NumberInput } from '@tremor/react'
-import { v4 } from 'uuid'
-
 import { useRouter } from 'next/navigation'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '../ui/alert-dialog'
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../ui/card'
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '../ui/form'
-import { useToast } from '../ui/use-toast'
 
-import * as z from 'zod'
-import FileUpload from '../global/file-upload'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form'
+import { useToast } from '../ui/use-toast'
 import { Input } from '../ui/input'
 import { Switch } from '../ui/switch'
-import {
-  deleteAgency,
-  initUser,
-  saveActivityLogsNotification,
-  updateAgencyDetails,
-  upsertAgency,
-} from '@/lib/queries'
 import { Button } from '../ui/button'
+
+import { zodResolver } from '@hookform/resolvers/zod'
+import { deleteAgency, initUser, saveActivityLogsNotification, updateAgencyDetails, upsertAgency } from '@/lib/queries'
+import FileUpload from '../global/file-upload'
+import { v4 } from 'uuid'
+import * as z from 'zod'
 import Loading from '../global/loading'
 
 type Props = {
@@ -136,29 +106,42 @@ const AgencyDetails = ({ data }: Props) => {
       throw new Error('Failed to create customer');
     }
 
-    // const customerData: { customerId: string } = await customerResponse.json();
-    // return customerData.customerId;
-
     return customerResponse.json()
 
   }
 
   const handleSubmit = async (values: AgencyFormValues) => {
+    console.log('RUN');
+
     try {
-      const customerData = !data?.id ? await createStripeCustomer(values) : null
+      // const customerData = !data?.id ? await createStripeCustomer(values) : null
       const newUserData = await initUser({ role: 'AGENCY_OWNER' })
+      console.log(newUserData, 'newUserData');
 
-      if (!data?.customerId && !customerData?.customerId) return
-
+      // if (!data?.customerId && !customerData?.customerId) return
+      if (!data?.id) return router.refresh()
       const agencyData = {
-        id: data?.id || v4(),
-        customerId: data?.customerId || customerData?.customerId || '',
-        ...values,
+        id: data?.id ? data.id : v4(),
+        // customerId: data?.customerId || customerData?.customerId || '',
+        address: values.address,
+        agencyLogo: values.agencyLogo,
+        city: values.city,
+        companyPhone: values.companyPhone,
+        country: values.country,
+        name: values.name,
+        state: values.state,
+        whiteLabel: values.whiteLabel,
+        zipCode: values.zipCode,
         createdAt: new Date(),
         updatedAt: new Date(),
+        companyEmail: values.companyEmail,
         connectAccountId: '',
         goal: 5,
       }
+
+      toast({
+        title: 'Agency create!'
+      })
 
       const response = await upsertAgency(agencyData)
       handleSuccess(response)
@@ -205,6 +188,7 @@ const AgencyDetails = ({ data }: Props) => {
 
   const handleGoalUpdate = async (val: number) => {
     if (!data?.id) return
+
     await updateAgencyDetails(data.id, { goal: val })
     await saveActivityLogsNotification({
       agencyId: data.id,
