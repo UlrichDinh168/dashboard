@@ -129,8 +129,12 @@ const AgencyDetails = ({ data }: Props) => {
           },
           body: JSON.stringify(bodyData),
         })
-        const customerData: { customerId: string } =
-          await customerResponse.json()
+
+        if (!customerResponse.ok) {
+          throw new Error('Failed to create customer');
+        }
+
+        const customerData: { customerId: string } = await customerResponse.json()
         custId = customerData.customerId
       }
 
@@ -179,7 +183,7 @@ const AgencyDetails = ({ data }: Props) => {
     setDeletingAgency(true)
     //WIP: discontinue the subscription
     try {
-      const response = await deleteAgency(data.id)
+      await deleteAgency(data.id)
       toast({
         title: 'Deleted Agency',
         description: 'Deleted your agency and all subaccounts',
