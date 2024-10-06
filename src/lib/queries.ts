@@ -137,7 +137,6 @@ export const createTeamUser = async (agencyId: string, user: User) => {
 export const verifyAndAcceptInvitation = async () => {
   try {
     const user = await currentUser();
-    console.log(user, 'here');
 
     if (!user) return redirect('/sign-in');
 
@@ -152,7 +151,7 @@ export const verifyAndAcceptInvitation = async () => {
         status: 'PENDING',
       },
     });
-    console.log(invitation, 'invitation');
+
 
     if (invitation) {
       const { agencyId, role, email } = invitation;
@@ -208,6 +207,7 @@ export const verifyAndAcceptInvitation = async () => {
     return null;
   }
 };
+
 
 export const upsertAgency = async (agency: Agency, price?: Plan) => {
   if (!agency.companyEmail) return null
