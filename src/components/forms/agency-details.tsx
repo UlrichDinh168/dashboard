@@ -1,54 +1,23 @@
 'use client'
+
 import { Agency } from '@prisma/client'
-import { useForm } from 'react-hook-form'
 import React, { useEffect, useState } from 'react'
-import { NumberInput } from '@tremor/react'
-import { v4 } from 'uuid'
-
-import { useRouter } from 'next/navigation'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '../ui/alert-dialog'
-import { zodResolver } from '@hookform/resolvers/zod'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '../ui/card'
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '../ui/form'
 import { useToast } from '../ui/use-toast'
-
+import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card'
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '../ui/form'
 import FileUpload from '../global/file-upload'
 import { Input } from '../ui/input'
 import { Switch } from '../ui/switch'
-import {
-  deleteAgency,
-  initUser,
-  saveActivityLogsNotification,
-  updateAgencyDetails,
-  upsertAgency,
-} from '@/lib/queries'
+import { useRouter } from 'next/navigation'
+import { NumberInput } from '@tremor/react'
+import { deleteAgency, initUser, saveActivityLogsNotification, updateAgencyDetails, upsertAgency } from '@/lib/queries'
 import { Button } from '../ui/button'
 import Loading from '../global/loading'
+import { v4 } from 'uuid'
 
 type Props = {
   data?: Partial<Agency>
@@ -70,23 +39,26 @@ const FormSchema = z.object({
 const AgencyDetails = ({ data }: Props) => {
   const { toast } = useToast()
   const router = useRouter()
+
   const [deletingAgency, setDeletingAgency] = useState(false)
+
   const form = useForm<z.infer<typeof FormSchema>>({
     mode: 'onChange',
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      name: data?.name,
-      companyEmail: data?.companyEmail,
-      companyPhone: data?.companyPhone,
+      name: data?.name || '',
+      companyEmail: data?.companyEmail || '',
+      companyPhone: data?.companyPhone || '',
       whiteLabel: data?.whiteLabel || false,
-      address: data?.address,
-      city: data?.city,
-      zipCode: data?.zipCode,
-      state: data?.state,
-      country: data?.country,
-      agencyLogo: data?.agencyLogo,
-    },
+      address: data?.address || '',
+      city: data?.city || '',
+      zipCode: data?.zipCode || '',
+      state: data?.state || '',
+      country: data?.country || '',
+      agencyLogo: data?.agencyLogo || '',
+    }
   })
+
   const isLoading = form.formState.isSubmitting
 
   useEffect(() => {
@@ -98,7 +70,6 @@ const AgencyDetails = ({ data }: Props) => {
   const handleSubmit = async (values: z.infer<typeof FormSchema>) => {
     try {
       let custId = data?.customerId || null;
-
       if (!data?.id) {
         const bodyData = {
           email: values.companyEmail,
@@ -125,21 +96,19 @@ const AgencyDetails = ({ data }: Props) => {
         const customerResponse = await fetch('/api/stripe/create-customer', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify(bodyData),
+          body: JSON.stringify(bodyData)
         })
 
         if (!customerResponse.ok) {
           throw new Error('Failed to create customer');
         }
-
         const customerData: { customerId: string } = await customerResponse.json()
+
         custId = customerData.customerId
       }
-
       await initUser({ role: 'AGENCY_OWNER' })
-
       if (!data?.customerId && !custId) return
 
       const response = await upsertAgency({
@@ -160,14 +129,15 @@ const AgencyDetails = ({ data }: Props) => {
         connectAccountId: '',
         goal: 5,
       })
+
       toast({
         title: 'Created Agency',
       })
       if (data?.id) return router.refresh()
-
       if (response) {
         return router.refresh()
       }
+
     } catch (error) {
       console.log(error)
       toast({
@@ -178,15 +148,15 @@ const AgencyDetails = ({ data }: Props) => {
     }
   }
 
-  const handleDeleteAgency = async () => {
+  const handleDeleteAgency = () => {
     if (!data?.id) return
     setDeletingAgency(true)
-    //WIP: discontinue the subscription
+
     try {
-      await deleteAgency(data.id)
+      deleteAgency(data.id)
       toast({
         title: 'Deleted Agency',
-        description: 'Deleted your agency and all subaccounts',
+        description: 'Deleted your agency and all subaccounts'
       })
       router.refresh()
     } catch (error) {
@@ -198,6 +168,7 @@ const AgencyDetails = ({ data }: Props) => {
       })
     }
     setDeletingAgency(false)
+
   }
 
   return (
