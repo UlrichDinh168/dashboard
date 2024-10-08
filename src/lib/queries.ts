@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation'
 
 import { clerkClient, currentUser } from "@clerk/nextjs/server"
 import { db } from "./db"
-import { Agency, Plan, User } from '@prisma/client'
+import { Agency, Plan, SubAccount, User } from '@prisma/client'
+import { v4 } from 'uuid'
 
 export const getAuthUserDetails = async () => {
   const user = await currentUser()
@@ -306,4 +307,163 @@ export const updateAgencyDetails = async (
     data: { ...agencyDetails },
   })
   return response
+}
+
+export const _getTicketsWithAllRelations = async (laneId: string) => {
+  const response = await db.ticket.findMany({
+    where: { laneId: laneId },
+    include: {
+      Assigned: true,
+      Customer: true,
+      Lane: true,
+      Tags: true,
+    },
+  })
+  return response
+}
+
+
+export const getFunnels = async (subacountId: string) => {
+  const funnels = await db.funnel.findMany({
+    where: { subAccountId: subacountId },
+    include: { FunnelPages: true },
+  })
+
+  return funnels
+}
+
+export const getMedia = async (subaccountId: string) => {
+  const mediafiles = await db.subAccount.findUnique({
+    where: {
+      id: subaccountId,
+    },
+    include: { Media: true },
+  })
+  return mediafiles
+}
+
+export const getPipelineDetails = async (pipelineId: string) => {
+  const response = await db.pipeline.findUnique({
+    where: {
+      id: pipelineId,
+    },
+  })
+  return response
+}
+
+export const getTicketsWithTags = async (pipelineId: string) => {
+  const response = await db.ticket.findMany({
+    where: {
+      Lane: {
+        pipelineId,
+      },
+    },
+    include: { Tags: true, Assigned: true, Customer: true },
+  })
+  return response
+}
+
+export const getUserPermissions = async (userId: string) => {
+  const response = await db.user.findUnique({
+    where: { id: userId },
+    select: { Permissions: { include: { SubAccount: true } } },
+  })
+
+  return response
+}
+
+export const upsertSubAccount = async (subAccount: SubAccount) => {
+  if (!subAccount.companyEmail) return null
+  const agencyOwner = await db.user.findFirst({
+    where: {
+      Agency: {
+        id: subAccount.agencyId,
+      },
+      role: 'AGENCY_OWNER',
+    },
+  })
+  if (!agencyOwner) return console.log('🔴Erorr could not create subaccount')
+  const permissionId = v4()
+  const response = await db.subAccount.upsert({
+    where: { id: subAccount.id },
+    update: subAccount,
+    create: {
+      ...subAccount,
+      Permissions: {
+        create: {
+          access: true,
+          email: agencyOwner.email,
+          id: permissionId,
+        },
+        connect: {
+          subAccountId: subAccount.id,
+          id: permissionId,
+        },
+      },
+      Pipeline: {
+        create: { name: 'Lead Cycle' },
+      },
+      SidebarOption: {
+        create: [
+          {
+            name: 'Launchpad',
+            icon: 'clipboardIcon',
+            link: `/subaccount/${subAccount.id}/launchpad`,
+          },
+          {
+            name: 'Settings',
+            icon: 'settings',
+            link: `/subaccount/${subAccount.id}/settings`,
+          },
+          {
+            name: 'Funnels',
+            icon: 'pipelines',
+            link: `/subaccount/${subAccount.id}/funnels`,
+          },
+          {
+            name: 'Media',
+            icon: 'database',
+            link: `/subaccount/${subAccount.id}/media`,
+          },
+          {
+            name: 'Automations',
+            icon: 'chip',
+            link: `/subaccount/${subAccount.id}/automations`,
+          },
+          {
+            name: 'Pipelines',
+            icon: 'flag',
+            link: `/subaccount/${subAccount.id}/pipelines`,
+          },
+          {
+            name: 'Contacts',
+            icon: 'person',
+            link: `/subaccount/${subAccount.id}/contacts`,
+          },
+          {
+            name: 'Dashboard',
+            icon: 'category',
+            link: `/subaccount/${subAccount.id}`,
+          },
+        ],
+      },
+    },
+  })
+  return response
+}
+
+
+export const getNotificationAndUser = async (agencyId: string) => {
+  try {
+    const response = await db.notification.findMany({
+      where: { agencyId },
+      include: { User: true },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+    return response
+  } catch (error) {
+    console.log(error)
+  }
 }
