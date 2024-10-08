@@ -69,10 +69,13 @@ type ModalContextType = {
   setClose: () => void
 }
 
+// Fallback Functionality: If a component tries to call setOpen or setClose and there is
+// no provider above it in the component tree, it won’t throw an error 
+// since it will simply execute an empty function.
 export const ModalContext = createContext<ModalContextType>({
   data: {},
   isOpen: false,
-  setOpen: ({ modal, fetchData }: SetOpenType) => { },
+  setOpen: () => { },
   setClose: () => { },
 })
 

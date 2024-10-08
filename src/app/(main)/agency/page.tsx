@@ -13,20 +13,14 @@ type SearchParams = {
   code?: string;
 };
 const Page = async ({ searchParams }: { searchParams: SearchParams }) => {
-  console.log(searchParams, 'searchpParams');
 
   const user = await getAuthUserDetails()
 
   // users were sent an invitation
   const agencyId = await verifyAndAcceptInvitation()
-  console.log(agencyId, 'agencyId');
 
   if (agencyId) {
-    console.log(agencyId, 'agencyId');
-
     const userRole = user?.role;
-    console.log(userRole, 'userRole');
-
     // Redirect subaccount users
     if (userRole === 'SUBACCOUNT_GUEST' || userRole === 'SUBACCOUNT_USER') {
       return redirect('/subaccount');
@@ -34,7 +28,6 @@ const Page = async ({ searchParams }: { searchParams: SearchParams }) => {
 
     // Redirect agency users
     if (userRole === 'AGENCY_OWNER' || userRole === 'AGENCY_ADMIN') {
-      console.log(searchParams.plan, searchParams.state, 'searchParams');
 
       if (searchParams.plan) {
         // Redirect to billing if the 'plan' parameter exists
@@ -63,7 +56,6 @@ const Page = async ({ searchParams }: { searchParams: SearchParams }) => {
   }
 
   const authUser = await currentUser()
-  console.log(authUser, 'authUser');
 
 
   return (
